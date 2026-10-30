@@ -10,6 +10,7 @@ jobs:
   build-windows:
     runs-on: windows-latest
     timeout-minutes: 90
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -38,11 +39,21 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path models | Out-Null
-          $modelUrl = "https://huggingface.co/tensorblock/SmolLM2-360M-Instruct-GGUF/resolve/main/SmolLM2-360M-Instruct-Q5_0.gguf"
-          Invoke-WebRequest -Uri $modelUrl -OutFile "models/SmolLM2-360M-Instruct-Q5_0.gguf"
-          if ((Get-Item "models/SmolLM2-360M-Instruct-Q5_0.gguf").Length -lt 100000000) {
+          $modelUrl = "https://huggingface.co/tensorblock/SmolLM2-360M-Instruct-GGUF/resolve/main/SmolLM2-360M-Instruct-Q4_K_M.gguf"
+          Invoke-WebRequest -Uri $modelUrl -OutFile "models/SmolLM2-360M-Instruct-Q4_K_M.gguf"
+          if ((Get-Item "models/SmolLM2-360M-Instruct-Q4_K_M.gguf").Length -lt 100000000) {
             throw "The model download looks incomplete."
           }
+
+      - name: Update app to use downloaded Q4_K_M model
+        shell: pwsh
+        run: |
+          $source = Get-Content "langan_desktop.py" -Raw
+          $updated = $source.Replace("SmolLM2-360M-Instruct-Q5_0.gguf", "SmolLM2-360M-Instruct-Q4_K_M.gguf")
+          if ($updated -eq $source) {
+            throw "Could not find the old Q5_0 model filename in langan_desktop.py. No source change was made."
+          }
+          Set-Content -Path "langan_desktop.py" -Value $updated -NoNewline
 
       - name: Build standalone EXE
         shell: pwsh
