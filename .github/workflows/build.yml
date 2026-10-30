@@ -25,7 +25,7 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          python -m pip install cmake ninja pyinstaller==6.16.0
+          python -m pip install cmake ninja pyinstaller==6.16.0 huggingface_hub
 
       - name: Install llama.cpp Python package
         shell: pwsh
@@ -35,24 +35,41 @@ jobs:
         run: |
           python -m pip install --no-cache-dir llama-cpp-python==0.3.16
 
-      - name: Download SmolLM2 GGUF model
+      - name: Download and verify SmolLM2 GGUF model
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path models | Out-Null
-          $modelUrl = "https://huggingface.co/tensorblock/SmolLM2-360M-Instruct-GGUF/resolve/main/SmolLM2-360M-Instruct-Q4_K_M.gguf"
-          Invoke-WebRequest -Uri $modelUrl -OutFile "models/SmolLM2-360M-Instruct-Q4_K_M.gguf"
-          if ((Get-Item "models/SmolLM2-360M-Instruct-Q4_K_M.gguf").Length -lt 100000000) {
-            throw "The model download looks incomplete."
+          hf download tensorblock/SmolLM2-360M-Instruct-GGUF SmolLM2-360M-Instruct-Q4_K_M.gguf --local-dir models
+          $model = "models/SmolLM2-360M-Instruct-Q4_K_M.gguf"
+          if (!(Test-Path $model)) {
+            throw "Model download failed: expected model file was not created."
+          }
+          $size = (Get-Item $model).Length
+          if ($size -lt 200000000) {
+            throw "Model download looks incomplete. File size: $size bytes"
+          }
+          $stream = [System.IO.File]::OpenRead((Resolve-Path $model))
+          try {
+            $magic = New-Object byte[] 4
+            [void]$stream.Read($magic, 0, 4)
+          } finally {
+            $stream.Dispose()
+          }
+          $signature = [System.BitConverter]::ToString($magic)
+          if ($signature -ne "47-47-55-46") {
+            throw "Downloaded file is not a GGUF model. Signature: $signature"
           }
 
-      - name: Update app to use downloaded Q4_K_M model
+      - name: Update app to use Q4_K_M model
         shell: pwsh
         run: |
           $source = Get-Content "langan_desktop.py" -Raw
-          $updated = $source.Replace("SmolLM2-360M-Instruct-Q5_0.gguf", "SmolLM2-360M-Instruct-Q4_K_M.gguf")
-          if ($updated -eq $source) {
-            throw "Could not find the old Q5_0 model filename in langan_desktop.py. No source change was made."
+          $oldName = "SmolLM2-360M-Instruct-Q5_0.gguf"
+          $newName = "SmolLM2-360M-Instruct-Q4_K_M.gguf"
+          if (!$source.Contains($oldName)) {
+            throw "Expected model filename was not found in langan_desktop.py."
           }
+          $updated = $source.Replace($oldName, $newName)
           Set-Content -Path "langan_desktop.py" -Value $updated -NoNewline
 
       - name: Build standalone EXE
