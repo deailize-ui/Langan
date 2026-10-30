@@ -39,7 +39,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path models | Out-Null
-          hf download tensorblock/SmolLM2-360M-Instruct-GGUF SmolLM2-360M-Instruct-Q4_K_M.gguf --local-dir models
+          hf download bartowski/SmolLM2-360M-Instruct-GGUF SmolLM2-360M-Instruct-Q4_K_M.gguf --local-dir models
           $model = "models/SmolLM2-360M-Instruct-Q4_K_M.gguf"
           if (!(Test-Path $model)) {
             throw "Model download failed: expected model file was not created."
